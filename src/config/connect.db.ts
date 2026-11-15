@@ -1,12 +1,9 @@
-import mongoose from "mongoose";
-import config from "./config";
+import { pool } from "../db";
 
 const ConnectDB = async (): Promise<void> => {
   try {
-    await mongoose.connect(config.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-    });
-    console.log("Connected to database..");
+    await pool.query("select 1");
+    console.log("Connected to PostgreSQL..");
   } catch (err) {
     console.error("DB connect error:", err);
     process.exit(1);
