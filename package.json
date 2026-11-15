@@ -6,26 +6,32 @@
     "build": "tsc",
     "start": "ts-node server.ts",
     "dev": "nodemon --watch src --watch server.ts --ext ts --exec ts-node server.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed:roles": "ts-node src/db/seed-roles.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "ThinkShare backend server - refactored to TypeScript following the BookChimp-Backend architecture.",
   "dependencies": {
-    "@google/genai": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.4",
     "express": "^5.2.1",
     "jose-cjs": "^6.2.3",
-    "mongoose": "^9.7.1"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^22.10.5",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
