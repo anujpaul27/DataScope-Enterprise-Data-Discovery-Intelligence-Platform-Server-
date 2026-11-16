@@ -7,6 +7,8 @@ import { requireAuth } from "../middleware/auth";
 import { requireDatasetAccess } from "../lib/access";
 import { notFound } from "../lib/http-error";
 import { COUNT_CAP, buildRecordsQuery, type FieldMeta } from "../lib/records-query";
+import { recordsCache } from "../lib/query-cache";
+import { recordSearch } from "../lib/search-history";
 
 // Mounted at /api/datasets/:id/records  (see app.ts)
 const router = Router({ mergeParams: true });
@@ -75,52 +77,72 @@ function pickPreview(
 router.get("/", async (req, res) => {
   const started = process.hrtime.bigint();
   const { id } = idParam.parse(req.params);
-  await requireDatasetAccess(req.user!, id, "read"); // 404 when there is no permission row
+  const user = req.user!;
+  // 1) permission and 2) validation come BEFORE the cache: the cache can never be used to
+  //    read a dataset without access, and invalid queries are never cached.
+  await requireDatasetAccess(user, id, "read"); // 404 when there is no permission row
 
   const fields = await loadFields(id);
   const query = buildRecordsQuery(req.query, fields);
 
-  const where = and(eq(datasetRecords.datasetId, id), ...query.where)!;
-  const order = sql.join(query.orderBy, sql`, `);
+  // 3) cache + request de-duplication (see lib/query-cache.ts)
+  const { value, status } = await recordsCache.getOrCompute(`${id}|${query.signature}`, async () => {
+    const computeStarted = process.hrtime.bigint();
+    const where = and(eq(datasetRecords.datasetId, id), ...query.where)!;
+    const order = sql.join(query.orderBy, sql`, `);
 
-  // Page rows and total count run at the same time (one round trip each, in parallel).
-  const [rows, countResult] = await Promise.all([
-    db.execute<{ id: string; data: Record<string, unknown>; created_at: string; updated_at: string }>(sql`
-      select dataset_records.id,
-             ${query.select} as data,
-             dataset_records.created_at,
-             dataset_records.updated_at
-      from dataset_records
-      where ${where}
-      order by ${order}
-      limit ${query.pageSize} offset ${query.offset}
-    `),
-    // Capped count: never scans more than COUNT_CAP + 1 matching rows, so the total
-    // stays cheap even when a dataset grows to many millions of rows.
-    db.execute<{ n: number }>(sql`
-      select count(*)::int as n
-      from (select 1 from dataset_records where ${where} limit ${COUNT_CAP + 1}) capped
-    `),
-  ]);
+    // Page rows and total count run at the same time (one round trip each, in parallel).
+    const [rows, countResult] = await Promise.all([
+      db.execute<{ id: string; data: Record<string, unknown>; created_at: string; updated_at: string }>(sql`
+        select dataset_records.id,
+               ${query.select} as data,
+               dataset_records.created_at,
+               dataset_records.updated_at
+        from dataset_records
+        where ${where}
+        order by ${order}
+        limit ${query.pageSize} offset ${query.offset}
+      `),
+      // Capped count: never scans more than COUNT_CAP + 1 matching rows, so the total
+      // stays cheap even when a dataset grows to many millions of rows.
+      db.execute<{ n: number }>(sql`
+        select count(*)::int as n
+        from (select 1 from dataset_records where ${where} limit ${COUNT_CAP + 1}) capped
+      `),
+    ]);
 
-  const counted = countResult.rows[0]?.n ?? 0;
-  const totalCapped = counted > COUNT_CAP;
-  const total = totalCapped ? COUNT_CAP : counted;
+    const counted = countResult.rows[0]?.n ?? 0;
+    const totalCapped = counted > COUNT_CAP;
+    return {
+      data: rows.rows.map((r) => ({
+        id: Number(r.id),
+        data: r.data,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      })),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: totalCapped ? COUNT_CAP : counted,
+      totalCapped,
+      tookMs: Math.round(Number(process.hrtime.bigint() - computeStarted) / 1e6),
+    };
+  });
 
   const ms = Number(process.hrtime.bigint() - started) / 1e6;
-  res.setHeader("Server-Timing", `records;dur=${ms.toFixed(1)}`);
-  res.json({
-    data: rows.rows.map((r) => ({
-      id: Number(r.id),
-      data: r.data,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    })),
+  res.setHeader("X-Cache", status.toUpperCase()); // HIT | MISS | SHARED
+  res.setHeader("Server-Timing", `records;dur=${ms.toFixed(1)}, cache;desc="${status}"`);
+  res.json({ ...value, tookMs: Math.round(ms), cached: status !== "miss" });
+
+  // 4) search history (after the response was sent: it can never slow the user down)
+  recordSearch({
+    userId: user.id,
+    datasetId: id,
     page: query.page,
-    pageSize: query.pageSize,
-    total,
-    totalCapped,
-    tookMs: Math.round(ms),
+    q: query.search.q,
+    filters: query.search.filters,
+    sort: query.search.sort,
+    resultCount: value.total,
+    durationMs: Math.round(ms),
   });
 });
 

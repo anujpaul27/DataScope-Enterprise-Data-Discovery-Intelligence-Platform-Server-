@@ -16,6 +16,7 @@ import {
 } from "../lib/access";
 import { badRequest, conflict, notFound } from "../lib/http-error";
 import { isUniqueViolation, likePattern, slugify } from "../lib/sql";
+import { invalidateDatasetCache } from "../lib/query-cache";
 
 const router = Router();
 router.use(requireAuth);
@@ -257,6 +258,7 @@ router.patch("/:id", requireRole("admin"), async (req, res) => {
     .where(eq(datasets.id, id))
     .returning();
   if (!updated) throw notFound("Dataset not found");
+  invalidateDatasetCache(id); // cached search results of this dataset are dropped
   res.json({ dataset: updated });
 });
 
@@ -268,6 +270,7 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
     .where(eq(datasets.id, id))
     .returning({ id: datasets.id });
   if (deleted.length === 0) throw notFound("Dataset not found");
+  invalidateDatasetCache(id);
   res.status(204).end();
 });
 

@@ -7,6 +7,8 @@ import meRoutes from "./routes/me.routes";
 import usersRoutes from "./routes/users.routes";
 import datasetsRoutes from "./routes/datasets.routes";
 import recordsRoutes from "./routes/records.routes";
+import searchHistoryRoutes from "./routes/search-history.routes";
+import adminRoutes from "./routes/admin.routes";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 
 const app: Application = express();
@@ -35,6 +37,8 @@ app.use("/api/me", meRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/datasets/:id/records", recordsRoutes);
 app.use("/api/datasets", datasetsRoutes);
+app.use("/api/search-history", searchHistoryRoutes);
+app.use("/api/admin", adminRoutes);
 
 // must stay last
 app.use(notFoundHandler);

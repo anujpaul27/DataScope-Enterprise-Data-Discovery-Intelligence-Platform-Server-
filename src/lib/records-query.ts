@@ -107,6 +107,14 @@ export interface RecordsQuery {
   where: SQL[]; // extra WHERE parts, AND-ed with dataset_id = ... by the route
   orderBy: SQL[];
   select: SQL; // the "data" expression
+  /** What the user really asked for (used for the search history). */
+  search: {
+    q: string | undefined;
+    filters: FilterInput[];
+    sort: { field: string; direction: "asc" | "desc" }[];
+  };
+  /** Stable text for this exact query. The server-side cache key. */
+  signature: string;
 }
 
 // ---------- 2. SQL helpers ------------------------------------------------
@@ -219,21 +227,29 @@ export function buildRecordsQuery(
     throw badRequest("That page is too deep. Narrow the results with search or filters.");
   }
 
+  // One character would match almost every row and no trigram index can help below 3
+  // characters, so refuse it with a clear message instead of running a huge query.
+  if (q.q !== undefined && q.q.length === 1) {
+    throw badRequest("Search text needs at least 2 characters");
+  }
+
   const where: SQL[] = [];
 
-  // Global search: ILIKE over every searchable text-like field (OR).
+  // Global search: ILIKE over every searchable TEXT field (OR).
+  // Phase 6 decision: "select" fields (status, country...) are NOT part of the global search.
+  // They have few distinct values, so the exact filter is the right tool, and leaving them
+  // out lets the trigram indexes (see sql/0001_search_indexes.sql) cover the whole OR.
   if (q.q) {
     const like = likePattern(q.q);
-    const searchable = fields.filter(
-      (f) => f.isSearchable && (f.type === "text" || f.type === "select"),
-    );
-    if (searchable.length === 0) throw badRequest("This dataset has no searchable fields");
+    const searchable = fields.filter((f) => f.isSearchable && f.type === "text");
+    if (searchable.length === 0) throw badRequest("This dataset has no searchable text fields");
     const any = or(...searchable.map((f) => sql`${textExpr(f.key)} ilike ${like}`));
     if (any) where.push(any);
   }
 
   // Field filters (AND).
-  for (const c of parseFilters(q.filters)) {
+  const filterInputs = parseFilters(q.filters);
+  for (const c of filterInputs) {
     const f = byKey.get(c.field);
     if (!f || !f.isFilterable) throw badRequest(`Unknown or non-filterable field "${c.field}"`);
     where.push(buildFilter(f, c, now));
@@ -242,7 +258,8 @@ export function buildRecordsQuery(
   // Multi-column sort + a stable tie-breaker so pages never overlap or skip rows.
   const orderBy: SQL[] = [];
   const seen = new Set<string>();
-  for (const s of parseSort(q.sort)) {
+  const sortInputs = parseSort(q.sort);
+  for (const s of sortInputs) {
     const f = byKey.get(s.field);
     if (!f || !f.isSortable) throw badRequest(`Unknown or non-sortable field "${s.field}"`);
     if (seen.has(s.field)) throw badRequest(`Field "${s.field}" is sorted twice`);
@@ -269,5 +286,14 @@ export function buildRecordsQuery(
           )})`;
   }
 
-  return { page: q.page, pageSize: q.pageSize, offset, where, orderBy, select };
+  return {
+    page: q.page,
+    pageSize: q.pageSize,
+    offset,
+    where,
+    orderBy,
+    select,
+    search: { q: q.q || undefined, filters: filterInputs, sort: sortInputs },
+    signature: JSON.stringify([q.page, q.pageSize, q.q ?? "", sortInputs, filterInputs, q.columns ?? ""]),
+  };
 }
