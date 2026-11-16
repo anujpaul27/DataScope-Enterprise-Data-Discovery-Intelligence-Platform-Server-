@@ -20,3 +20,6 @@ export const forbidden = (message = "You do not have permission to do this") =>
   new HttpError(403, "FORBIDDEN", message);
 export const notFound = (message = "Not found") =>
   new HttpError(404, "NOT_FOUND", message);
+// Phase 4: needed when a unique value (e.g. dataset slug) is already taken.
+export const conflict = (message: string) =>
+  new HttpError(409, "CONFLICT", message);
