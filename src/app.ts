@@ -17,7 +17,7 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("DataScope API is running..");
 });
 
-// Health check: also proves the database is reachable
+// Health check: also proves the database is reachable as well 
 app.get("/health", async (_req: Request, res: Response) => {
   try {
     await pool.query("select 1");
