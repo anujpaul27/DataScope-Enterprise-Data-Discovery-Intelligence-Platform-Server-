@@ -10,6 +10,7 @@ import recordsRoutes from "./routes/records.routes";
 import searchHistoryRoutes from "./routes/search-history.routes";
 import adminRoutes from "./routes/admin.routes";
 import { errorHandler, notFoundHandler } from "./middleware/error";
+import savedViewsRouter from './routes/saved-views.routes';
 
 const app: Application = express();
 
@@ -39,6 +40,7 @@ app.use("/api/datasets/:id/records", recordsRoutes);
 app.use("/api/datasets", datasetsRoutes);
 app.use("/api/search-history", searchHistoryRoutes);
 app.use("/api/admin", adminRoutes);
+app.use('/api/saved-views', savedViewsRouter);
 
 // must stay last
 app.use(notFoundHandler);
