@@ -3,6 +3,9 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import config from "./config/config";
 import { pool } from "./db";
+import meRoutes from "./routes/me.routes";
+import usersRoutes from "./routes/users.routes";
+import { errorHandler, notFoundHandler } from "./middleware/error";
 
 const app: Application = express();
 
@@ -11,13 +14,11 @@ app.use(express.json());
 app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
 app.use(cookieParser());
 
-// routes (feature routers will be mounted here in the next phases)
-
 app.get("/", (_req: Request, res: Response) => {
   res.send("DataScope API is running..");
 });
 
-// Health check: also proves the database is reachable as well 
+// Health check: also proves the database is reachable
 app.get("/health", async (_req: Request, res: Response) => {
   try {
     await pool.query("select 1");
@@ -26,5 +27,13 @@ app.get("/health", async (_req: Request, res: Response) => {
     res.status(503).json({ status: "error", db: "down" });
   }
 });
+
+// feature routers (more are mounted here in later phases)
+app.use("/api/me", meRoutes);
+app.use("/api/users", usersRoutes);
+
+// must stay last
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;
