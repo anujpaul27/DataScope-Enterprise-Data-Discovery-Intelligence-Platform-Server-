@@ -11,7 +11,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed:roles": "ts-node src/db/seed-roles.ts",
-    "db:seed": "ts-node src/db/seed/index.ts"
+    "db:seed": "ts-node src/db/seed/index.ts",
+    "db:make-admin": "ts-node src/db/make-admin.ts",
+    "db:grant": "ts-node src/db/grant-access.ts"
   },
   "keywords": [],
   "author": "",
