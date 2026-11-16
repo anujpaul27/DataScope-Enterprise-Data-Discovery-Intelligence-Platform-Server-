@@ -5,6 +5,7 @@ import config from "./config/config";
 import { pool } from "./db";
 import meRoutes from "./routes/me.routes";
 import usersRoutes from "./routes/users.routes";
+import datasetsRoutes from "./routes/datasets.routes";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 
 const app: Application = express();
@@ -31,6 +32,7 @@ app.get("/health", async (_req: Request, res: Response) => {
 // feature routers (more are mounted here in later phases)
 app.use("/api/me", meRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/datasets", datasetsRoutes);
 
 // must stay last
 app.use(notFoundHandler);
