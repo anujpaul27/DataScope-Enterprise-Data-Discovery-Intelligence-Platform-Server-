@@ -8,8 +8,10 @@ if (!process.env.DATABASE_URL) {
 
 // better-auth runs inside the Next.js app, so its public URL is the frontend URL.
 // Express only *verifies* the JWTs that better-auth issues, using its JWKS endpoint.
-const clientUrl = process.env.CLIENT_URL ?? "http://localhost:3000";
-const authBaseUrl = (process.env.AUTH_BASE_URL ?? clientUrl).replace(/\/+$/, "");
+// Remove spaces and trailing slashes: "https://site.com/" would never match the browser's Origin.
+const clean = (url: string) => url.trim().replace(/\/+$/, "");
+const clientUrl = clean(process.env.CLIENT_URL ?? "http://localhost:3000");
+const authBaseUrl = clean(process.env.AUTH_BASE_URL ?? clientUrl);
 
 interface Config {
   PORT: number;

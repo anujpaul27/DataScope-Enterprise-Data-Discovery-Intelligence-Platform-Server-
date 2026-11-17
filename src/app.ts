@@ -17,10 +17,9 @@ const app: Application = express();
 // middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://data-scope-kappa.vercel.app/", // Firebase frontend
-];
+// Browsers send the Origin WITHOUT a trailing slash, so the list must not have one either.
+// CLIENT_URL (cleaned in config.ts) is the production frontend; localhost is for development.
+const allowedOrigins = [config.CLIENT_URL, "http://localhost:3000"];
 app.use(
   cors({
     origin: allowedOrigins,
