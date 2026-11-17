@@ -6,9 +6,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is empty! Check your .env file.");
 }
 
-// better-auth runs inside the Next.js app, so its public URL is the frontend URL.
-// Express only *verifies* the JWTs that better-auth issues, using its JWKS endpoint.
-// Remove spaces and trailing slashes: "https://site.com/" would never match the browser's Origin.
+
 const clean = (url: string) => url.trim().replace(/\/+$/, "");
 const clientUrl = clean(process.env.CLIENT_URL ?? "http://localhost:3000");
 const authBaseUrl = clean(process.env.AUTH_BASE_URL ?? clientUrl);
